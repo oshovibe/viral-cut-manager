@@ -39,9 +39,29 @@ publication** sur les comptes non « warmed ».
 
 ## Démarrage
 
+### App Mac (recommandé) — tout-en-un
+
+Une app Electron lance l'outil sans terminal : double-clic → elle migre la base, charge les
+données d'exemple, démarre le serveur et ouvre la fenêtre.
+
+```bash
+# 1. Préparer le dashboard (une fois)
+cd apps/dashboard && npm install && cp .env.example .env && npm run build && cd ..
+
+# 2. Construire l'app Mac
+cd desktop && npm install && npm run dist
+# → apps/desktop/dist/mac-arm64/Viral Cut Manager.app  (glisser dans Applications)
+```
+
+En développement, sans packager : `cd apps/desktop && npm install && npm start`.
+La base de données de l'app vit dans `~/Library/Application Support/Viral Cut Manager/vcm.db`.
+
+### En navigateur (dev)
+
 ```bash
 cd apps/dashboard
 npm install
+cp .env.example .env
 npx prisma migrate dev      # crée la base SQLite
 npm run seed                # projet "Coupe du Monde 2026" + données d'exemple
 npm run dev                 # http://localhost:3000
