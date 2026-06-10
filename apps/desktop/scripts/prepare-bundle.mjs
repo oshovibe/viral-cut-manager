@@ -45,8 +45,11 @@ fs.cpSync(src, dest, {
 });
 console.log(`[prepare-bundle] Copié ${src} → ${dest}`);
 
+// -h : déréférence les liens symboliques (Prisma génère .next/node_modules/@prisma/client-<hash>
+// comme un symlink ABSOLU vers le node_modules de la machine de build ; sans -h, le tarball
+// embarque un lien mort → "Cannot find module" sur une autre machine).
 const tarball = path.resolve(here, "..", "dashboard.tar.gz");
 fs.rmSync(tarball, { force: true });
-execFileSync("tar", ["czf", tarball, "-C", dest, "."], { stdio: "inherit" });
+execFileSync("tar", ["czhf", tarball, "-C", dest, "."], { stdio: "inherit" });
 const mb = (fs.statSync(tarball).size / 1024 / 1024).toFixed(0);
 console.log(`[prepare-bundle] Archive ${tarball} (${mb} Mo)`);
