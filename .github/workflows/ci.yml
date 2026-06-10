@@ -1,0 +1,76 @@
+name: CI
+
+# Flux : feature/* → (PR) → staging → (PR) → production
+#  - PR vers staging/production : job `validate` (build du dashboard) pour gater le merge
+#  - push sur staging/production : job `package` (produit le .app en artefact)
+on:
+  push:
+    branches: [staging, production]
+  pull_request:
+    branches: [staging, production]
+  workflow_dispatch:
+
+jobs:
+  # Validation rapide sur les PR : on s'assure que le dashboard build avant de merger.
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: macos-14
+    env:
+      DATABASE_URL: "file:./dev.db"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Dashboard — install
+        working-directory: apps/dashboard
+        run: npm ci
+      - name: Dashboard — prisma generate
+        working-directory: apps/dashboard
+        run: npx prisma generate
+      - name: Dashboard — build
+        working-directory: apps/dashboard
+        run: npm run build
+      - name: Dashboard — lint
+        working-directory: apps/dashboard
+        run: npm run lint
+
+  # Packaging du .app sur push (staging = préversion, production = stable).
+  package:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: macos-14
+    env:
+      DATABASE_URL: "file:./dev.db"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Dashboard — install
+        working-directory: apps/dashboard
+        run: npm ci
+      - name: Dashboard — prisma generate
+        working-directory: apps/dashboard
+        run: npx prisma generate
+      - name: Dashboard — build
+        working-directory: apps/dashboard
+        run: npm run build
+
+      - name: Desktop — install
+        working-directory: apps/desktop
+        run: npm ci
+      - name: Desktop — package (.app)
+        working-directory: apps/desktop
+        run: npm run dist
+
+      - name: Zip .app
+        working-directory: apps/desktop/dist/mac-arm64
+        run: ditto -c -k --keepParent "Viral Cut Manager.app" "Viral-Cut-Manager-${{ github.ref_name }}-mac-arm64.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Viral-Cut-Manager-${{ github.ref_name }}-mac-arm64
+          path: apps/desktop/dist/mac-arm64/Viral-Cut-Manager-${{ github.ref_name }}-mac-arm64.zip
+          retention-days: 30
