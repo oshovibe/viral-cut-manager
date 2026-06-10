@@ -1,0 +1,164 @@
+// Viral Cut Manager — modèle de données (core data & revenus)
+// SQLite ne supporte pas les enums Prisma : les champs "enum-like" sont des String
+// dont les valeurs autorisées sont documentées en commentaire et centralisées dans lib/enums.ts.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id        String   @id @default(cuid())
+  name      String
+  // type: "local-mpt" | "remakeit" | "local-full"
+  type      String
+  niche     String
+  // status: "active" | "paused" | "archived"
+  status    String   @default("active")
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accounts Account[]
+  videos   Video[]
+  revenues Revenue[]
+  costs    Cost[]
+}
+
+model Account {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // platform: "tiktok" | "instagram" | "youtube"
+  platform  String
+  handle    String
+  // warmupState: "new" | "warming" | "warmup_content" | "assessment" | "warmed" | "extended" | "suppressed"
+  warmupState String @default("new")
+  // health: "healthy" | "warning" | "suspended"
+  health    String  @default("healthy")
+  strikes   Int     @default(0)
+  // JSON sérialisé des artefacts warm-up (plan / brief J3 / assessment) — voir lib/warmup.ts
+  warmupPlanJson       String?
+  warmupBriefJson      String?
+  warmupAssessmentJson String?
+  warmupStartedAt      DateTime?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  warmupActivities WarmupActivity[]
+  posts            Post[]
+}
+
+model WarmupActivity {
+  id        String   @id @default(cuid())
+  accountId String
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  day       Int      // jour de warm-up (1, 2, 3...)
+  // session: "morning" | "afternoon" | "evening"
+  session   String
+  // JSON: { itemKey: true/false } des éléments de checklist cochés
+  checklistJson String
+  notes     String?
+  createdAt DateTime @default(now())
+
+  @@index([accountId])
+}
+
+model Video {
+  id         String  @id @default(cuid())
+  projectId  String
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title      String
+  // sourceType: "youtube" | "prompt" | "upload"
+  sourceType String
+  sourceUrl  String?
+  brief      String?
+  // producedBy: "local-mpt" | "remakeit" | "local-full" | "manual"
+  producedBy String
+  // status: "draft" | "in_review" | "approved" | "rejected" | "published"
+  status     String  @default("in_review")
+  filePath   String?
+  durationSec Int?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  posts Post[]
+}
+
+model Post {
+  id         String  @id @default(cuid())
+  videoId    String
+  video      Video   @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  accountId  String
+  account    Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  // platform: "tiktok" | "instagram" | "youtube"
+  platform   String
+  url        String?
+  caption    String?
+  hashtags   String?
+  // status: "scheduled" | "published" | "removed"
+  status     String  @default("published")
+  publishedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  metrics  MetricSnapshot[]
+  revenues Revenue[]
+}
+
+model MetricSnapshot {
+  id        String   @id @default(cuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  capturedAt DateTime @default(now())
+  views     Int      @default(0)
+  likes     Int      @default(0)
+  comments  Int      @default(0)
+  shares    Int      @default(0)
+  watchTimePct   Float?
+  profileVisits  Int?
+  followersGained Int?
+  // source: "manual" | "upload-post" | "monid"
+  source    String   @default("manual")
+
+  @@index([postId])
+}
+
+model Revenue {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  postId    String?
+  post      Post?    @relation(fields: [postId], references: [id], onDelete: SetNull)
+  // program: "tiktok_creator_rewards" | "youtube_shorts" | "instagram_bonus" | "brand_deal" | "other"
+  program   String
+  amountCents Int
+  currency  String   @default("EUR")
+  estimated Boolean  @default(false)
+  periodStart DateTime?
+  periodEnd   DateTime?
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+}
+
+model Cost {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  label     String
+  amountCents Int
+  currency  String   @default("EUR")
+  recurring Boolean  @default(false)
+  incurredAt DateTime @default(now())
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+}

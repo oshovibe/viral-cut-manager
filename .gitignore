@@ -78,6 +78,11 @@ web_modules/
 .next
 out
 
+# Prisma / SQLite (la base locale ne se versionne pas, mais les migrations oui)
+*.db
+*.db-journal
+prisma/dev.db*
+
 # Nuxt.js build / generate output
 .nuxt
 dist
