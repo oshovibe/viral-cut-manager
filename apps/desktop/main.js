@@ -2,24 +2,46 @@ const { app, BrowserWindow, shell, dialog } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
 const net = require("node:net");
+const { execFileSync } = require("node:child_process");
 const { startDashboard } = require("./bootstrap");
 
 let mainWindow = null;
 let serverChild = null;
 
-// Chemin du dashboard dans le repo (baké pour cette machine). L'app est un lanceur
-// léger qui pointe vers ce dossier — pas une copie figée. Conséquence : modifier le
-// code du dashboard ne demande PAS de reconstruire le .app (un `npm run build`, ou
-// rien du tout en mode dev, suffit). Surchargeable via VCM_DASHBOARD_DIR.
-const REPO_DASHBOARD = "/Volumes/Mini_Data/OshOVibe/viral-cut-manager/apps/dashboard";
-
-// VCM_DEV=1 → `next dev` (hot-reload : éditer le code rafraîchit la page sans rebuild).
+// Résolution du dossier dashboard :
+//  - packagé : le dashboard voyage en tarball (resources/dashboard.tar.gz) et est extrait
+//    au premier lancement dans userData/dashboard (zone inscriptible). Réextrait si le
+//    tarball change (mise à jour de l'app).
+//  - non packagé (dev local) : le dossier du repo ../dashboard
+//  - VCM_DASHBOARD_DIR surcharge tout
 const DEV_MODE = process.env.VCM_DEV === "1";
 
-function dashboardDir() {
+function ensurePackagedDashboard(onLog) {
+  const tarball = path.join(process.resourcesPath, "dashboard.tar.gz");
+  const target = path.join(app.getPath("userData"), "dashboard");
+  const marker = path.join(app.getPath("userData"), ".dashboard.version");
+
+  const st = fs.statSync(tarball);
+  const sig = `${st.size}-${Math.round(st.mtimeMs)}`;
+  const ready = fs.existsSync(path.join(target, ".next", "BUILD_ID"));
+  const current = fs.existsSync(marker)
+    ? fs.readFileSync(marker, "utf8").trim()
+    : "";
+
+  if (!ready || current !== sig) {
+    if (onLog) onLog("Installation du dashboard (première fois)…");
+    fs.rmSync(target, { recursive: true, force: true });
+    fs.mkdirSync(target, { recursive: true });
+    execFileSync("tar", ["xzf", tarball, "-C", target]);
+    fs.writeFileSync(marker, sig);
+  }
+  return target;
+}
+
+function dashboardDir(onLog) {
   if (process.env.VCM_DASHBOARD_DIR) return process.env.VCM_DASHBOARD_DIR;
-  if (!app.isPackaged) return path.join(__dirname, "..", "dashboard");
-  return REPO_DASHBOARD;
+  if (app.isPackaged) return ensurePackagedDashboard(onLog);
+  return path.join(__dirname, "..", "dashboard");
 }
 
 function getFreePort() {
@@ -68,7 +90,7 @@ function setStatus(msg) {
 
 async function boot() {
   try {
-    const dir = dashboardDir();
+    const dir = dashboardDir(setStatus);
     if (!fs.existsSync(path.join(dir, "package.json"))) {
       throw new Error(`Dashboard introuvable : ${dir}`);
     }

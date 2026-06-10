@@ -39,24 +39,7 @@ publication** sur les comptes non « warmed ».
 
 ## Démarrage
 
-### App Mac (recommandé) — tout-en-un
-
-Une app Electron lance l'outil sans terminal : double-clic → elle migre la base, charge les
-données d'exemple, démarre le serveur et ouvre la fenêtre.
-
-```bash
-# 1. Préparer le dashboard (une fois)
-cd apps/dashboard && npm install && cp .env.example .env && npm run build && cd ..
-
-# 2. Construire l'app Mac
-cd desktop && npm install && npm run dist
-# → apps/desktop/dist/mac-arm64/Viral Cut Manager.app  (glisser dans Applications)
-```
-
-En développement, sans packager : `cd apps/desktop && npm install && npm start`.
-La base de données de l'app vit dans `~/Library/Application Support/Viral Cut Manager/vcm.db`.
-
-### En navigateur (dev)
+### Développement — dans le navigateur
 
 ```bash
 cd apps/dashboard
@@ -65,6 +48,27 @@ cp .env.example .env
 npx prisma migrate dev      # crée la base SQLite
 npm run seed                # projet "Coupe du Monde 2026" + données d'exemple
 npm run dev                 # http://localhost:3000
+```
+
+C'est le mode de travail au quotidien : hot-reload, itération rapide.
+
+### Production — app Mac packagée par CI
+
+L'app Electron est l'**artefact de production**. À chaque push sur la branche **`production`**,
+le workflow GitHub Actions [`electron-production.yml`](.github/workflows/electron-production.yml)
+construit le dashboard et packe un `.app` Mac **self-contained** (le dashboard voyage en
+tarball, extrait au premier lancement dans `~/Library/Application Support/`), téléchargeable
+en artefact de build.
+
+Au lancement, l'app fait tout toute seule : extraction, migration de la base, données
+d'exemple, démarrage du serveur, ouverture de la fenêtre.
+
+Pour packager manuellement en local :
+
+```bash
+cd apps/dashboard && npm install && cp .env.example .env && npm run build && cd ../desktop
+npm install && npm run dist
+# → apps/desktop/dist/mac-arm64/Viral Cut Manager.app
 ```
 
 ## Statut

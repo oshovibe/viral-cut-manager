@@ -1,0 +1,57 @@
+name: Build app Mac (production)
+
+# Packe l'app Electron à chaque passage sur la branche `production`.
+on:
+  push:
+    branches: [production]
+  workflow_dispatch:
+
+jobs:
+  build-mac:
+    # Runner Apple Silicon : l'artefact (et le moteur Prisma) ciblent arm64.
+    runs-on: macos-14
+    env:
+      DATABASE_URL: "file:./dev.db"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # --- Dashboard : install, génération Prisma, build ---
+      - name: Dashboard — install
+        working-directory: apps/dashboard
+        run: npm ci
+
+      - name: Dashboard — prisma generate
+        working-directory: apps/dashboard
+        run: npx prisma generate
+
+      - name: Dashboard — build
+        working-directory: apps/dashboard
+        run: npm run build
+
+      # --- Desktop : install + packaging du .app self-contained ---
+      - name: Desktop — install
+        working-directory: apps/desktop
+        run: npm ci
+
+      - name: Desktop — package (.app)
+        working-directory: apps/desktop
+        run: npm run dist
+
+      # --- Artefact ---
+      - name: Zip .app
+        working-directory: apps/desktop/dist/mac-arm64
+        run: ditto -c -k --keepParent "Viral Cut Manager.app" "Viral-Cut-Manager-mac-arm64.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Viral-Cut-Manager-mac-arm64
+          path: apps/desktop/dist/mac-arm64/Viral-Cut-Manager-mac-arm64.zip
+          retention-days: 30

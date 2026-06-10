@@ -6,8 +6,9 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --mac dir",
-    "dmg": "electron-builder --mac dmg"
+    "prepare:bundle": "node scripts/prepare-bundle.mjs",
+    "dist": "npm run prepare:bundle && electron-builder --mac dir",
+    "dmg": "npm run prepare:bundle && electron-builder --mac dmg"
   },
   "build": {
     "appId": "io.oshovibe.viralcutmanager",
@@ -18,6 +19,12 @@
       "bootstrap.js",
       "loading.html",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "dashboard.tar.gz",
+        "to": "dashboard.tar.gz"
+      }
     ],
     "mac": {
       "category": "public.app-category.productivity",
